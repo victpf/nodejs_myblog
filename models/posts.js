@@ -1,68 +1,67 @@
-
 //新建 models/posts.js 用来存放与文章操作相关的代码：
 var Post = require('../lib/mongo').Post;
 var marked = require('marked');
 
 module.exports = {
-  // 创建一篇文章
-  create: function create(post) {
-    return Post.create(post).exec();
-  }
+    // 创建一篇文章
+    create: function create(post) {
+        return Post.create(post).exec();
+    }
 };
 
 
 // 将 post 的 content 从 markdown 转换成 html
 Post.plugin('contentToHtml', {
-  afterFind: function (posts) {
-    return posts.map(function (post) {
-      post.content = marked(post.content);
-      return post;
-    });
-  },
-  afterFindOne: function (post) {
-    if (post) {
-      post.content = marked(post.content);
+    afterFind: function(posts) {
+        return posts.map(function(post) {
+            post.content = marked(post.content);
+            return post;
+        });
+    },
+    afterFindOne: function(post) {
+        if (post) {
+            post.content = marked(post.content);
+        }
+        return post;
     }
-    return post;
-  }
 });
 
 
 module.exports = {
-  // 创建一篇文章
-  create: function create(post) {
-    return Post.create(post).exec();
-  },
+    // 创建一篇文章
+    create: function create(post) {
+        return Post.create(post).exec();
+    },
 
-  // 通过文章 id 获取一篇文章
-  getPostById: function getPostById(postId) {
-    return Post
-      .findOne({ _id: postId })
-      .populate({ path: 'author', model: 'User' })
-      .addCreatedAt()
-      .contentToHtml()
-      .exec();
-  },
+    // 通过文章 id 获取一篇文章
+    getPostById: function getPostById(postId) {
+        return Post
+            .findOne({ _id: postId })
+            .populate({ path: 'author', model: 'User' })
+            .addCreatedAt()
+            .contentToHtml() //需要了解一下这些plugin的机制以及他们的目的，作用。如何注册，如何调用，什么场景下面调用
+            .exec();
+    },
 
-  // 按创建时间降序获取所有用户文章或者某个特定用户的所有文章
-  getPosts: function getPosts(author) {
-    var query = {};
-    if (author) {
-      query.author = author;
+    // 按创建时间降序获取所有用户文章或者某个特定用户的所有文章
+    getPosts: function getPosts(author) {
+        var query = {};
+        if (author) {
+            query.author = author;
+        }
+        return Post
+            .find(query)
+            .populate({ path: 'author', model: 'User' })
+            .sort({ _id: -1 })
+            .addCreatedAt()
+            .contentToHtml()
+            .exec();
+    },
+
+    // 通过文章 id 给 pv 加 1
+    incPv: function incPv(postId) {
+        return Post
+            .update({ _id: postId }, { $inc: { pv: 1 } })
+            .exec();
     }
-    return Post
-      .find(query)
-      .populate({ path: 'author', model: 'User' })
-      .sort({ _id: -1 })
-      .addCreatedAt()
-      .contentToHtml()
-      .exec();
-  },
-
-  // 通过文章 id 给 pv 加 1
-  incPv: function incPv(postId) {
-    return Post
-      .update({ _id: postId }, { $inc: { pv: 1 } })
-      .exec();
-  }
 };
