@@ -55,9 +55,11 @@ router.post('/', checkLogin, function(req, res, next) {
   };
 
   PostModel.create(post)
-    .then(function (result) {
+    .then(function (result1) {
       // 此 post 是插入 mongodb 后的值，包含 _id
-      post = result.ops[0];
+      post = result1.ops[0];
+      post1 = result1;
+      console.log(result1);
       req.flash('success', '发表成功');
       // 发表成功后跳转到该文章页
       res.redirect(`/posts/${post._id}`);
