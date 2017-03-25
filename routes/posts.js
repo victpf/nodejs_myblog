@@ -46,15 +46,6 @@ router.post('/', checkLogin, function(req, res, next) {
         req.flash('error', e.message);
         return res.redirect('back');
     }
-<<<<<<< HEAD
-    if (!content.length) {
-      throw new Error('请填写内容');
-    }
-  } catch (e) {
-    req.flash('error', e.message);
-    return res.redirect('back');
-  }
-
   var post = {
     author: author,
     title: title,
@@ -73,7 +64,6 @@ router.post('/', checkLogin, function(req, res, next) {
       res.redirect(`/posts/${post._id}`);
     })
     .catch(next);
-=======
 
     var post = {
         author: author,
@@ -91,7 +81,6 @@ router.post('/', checkLogin, function(req, res, next) {
             res.redirect(`/posts/${post._id}`);
         })
         .catch(next);
->>>>>>> 80688d676388a12457edaa2a2a22a1d8ee37a472
 });
 
 // GET /posts/create 发表文章页
