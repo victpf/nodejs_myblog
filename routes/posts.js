@@ -80,8 +80,8 @@ router.get('/:postId', function(req, res, next) {
             PostModel.incPv(postId) // pv 加 1
         ])
         .then(function(result) {
-            var post = result[0];
-            var comments = result[1];
+            var post = result[0]; //PostModel.getPostById(postId),的输出
+            var comments = result[1]; //CommentModel.getComments(postId),的输出
             if (!post) {
                 throw new Error('该文章不存在');
             }
