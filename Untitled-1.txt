@@ -1,0 +1,228 @@
+/*+------------------------------------------------------------------+*/
+/*|                                                                  |*/
+/*| LICENSED MATERIALS - PROPERTY OF IBM                             |*/
+/*| 5698-T07                                                         |*/
+/*| ?COPYRIGHT IBM CORPORATION 2017.                                |*/
+/*|                                                                  |*/
+/*| US GOVERNMENT USERS RESTRICTED RIGHTS - USE, DUPLICATION OR      |*/
+/*| DISCLOSURE RESTRICTED BY GSA ADP SCHEDULE CONTRACT WITH IBM CORP.|*/
+/*|                                                                  |*/
+/*+------------------------------------------------------------------+*/
+/*********************************************************************/
+/*+-----+-------------------------------------------+----------+----+*/
+/*| No. |           Change Description              |   Date   | ID |*/
+/*+-----+-------------------------------------------+----------+----+*/
+/*| NEW | NEW                                   V550| 03/28/17 | PF |*/
+/*+-----+-------------------------------------------+----------+----+*/
+parse arg hostpanel , subpanelno , calltype , direction .
+ 
+var.=''
+ 
+do queued();
+  parse pull data;
+  parse var data type rest;
+  if type = "VARENTRY" then do;
+    parse var rest name value;
+    if name = "ZSELCOLS" | name = "ZSELDATA" then iterate;
+    value=strip(value);
+    var.name=value;
+    end;
+end;
+delstack;
+ 
+gbl._debug = 1;
+quote ="'"
+act_str = "D";
+act_tmp = "";
+attr_next = "";
+attr_prev = "";
+attr_in = "";
+attr_pre = "";
+temp     = "";
+inc = 1;
+count = 1;
+level   = var.U_KCPLEVEL;
+maxlevel   = var.U_KCPMAXLV;
+attr    = strip(var.U_KCPATTR,t,'=');
+scname  = var.U_KCPSCNAME;
+workload = var.U_KCPWKLOAD;
+srule = var.U_KCPSCULE;
+attrs = 'TranID CICSname LUname UserID';
+/*  queue "SETVAR ZACTIONFILTER PR"   */
+/*  if level = 1 & lastpos( &attr ,&attrs) = 0 */
+/* TranID : 1 */
+/* CICSname : 8 */
+/* UserID   : 24 */
+/* LUname   : 17 */
+/* 1. C Add CICSname */
+/* 2. D Delete */
+/* 3. L Add LUname */
+/* 4. T Add TranID */
+/* 5. U Add UserID */
+/*   check xxx */
+rec# = 1;
+level1 = 0;
+          say 'srule0: ' srule;
+do while srule \= '' | count=30
+    parse var srule value1 srule
+    if value1 = "TranID"   | ,
+       value1 = "CICSname" | ,
+       value1 = "UserID"   | ,
+       value1 = "LUname" Then do;
+          say 'srule1: ' srule;
+          first=pos(quote,srule)+1;
+          say 'first: 'first;
+          second=pos(quote,srule,2);
+          say 'sec  : 'second;
+          value=substr(srule,first,second-first);
+          rest=substr(srule,second+1);
+          say 'rest: 'rest;
+          parse var rest type srule;
+          gbl.rec#._RULE = value1;
+          say ' Service Class Rule: 'gbl.rec#._RULE;
+          say ' srule2: 'srule;
+          parse var srule isitor rest;
+          say 'rest3: 'rest;
+          say 'isitor3: 'isitor;
+          if isitor \= "|" Then ,
+            if inc then level1 = level1 + 1;
+          inc=1;
+          gbl.rec#._LEVEL = level1;
+          rec# = rec# + 1;
+        end ;
+        else if value1 = "&" Then do ;
+          level1 = level1 - 1 ;
+          inc = 0 ;
+        end ;
+        count = count + 1;
+      end;
+rec# = rec#-1;
+say 'rec#:  'rec#;
+if gbl._debug then do f = 1 to rec#;
+   say 'xxxx RULE  xxxx: 'gbl.f._RULE;
+   say 'xxxx LEVEL xxxx: 'gbl.f._LEVEL;
+end;
+/****/
+if level = 1 & lastpos(attr ,attrs) = 1 then
+   queue "SETVAR ZACTIONFILTER CDLU"
+if level = 1 & lastpos(attr ,attrs) = 8 then
+   queue "SETVAR ZACTIONFILTER DLTU"
+if level = 1 & lastpos(attr ,attrs) = 17 then
+   queue "SETVAR ZACTIONFILTER CDTU"
+if level = 1 & lastpos(attr ,attrs) = 24 then
+   queue "SETVAR ZACTIONFILTER CDLT"
+/*  level = 2  */
+if level = 2 then do i = 1 to rec#;
+   if gbl.i._LEVEL = 2 & gbl.i._RULE = attr then do;
+      say 'gbl.i._LEVEL: 'gbl.i._LEVEL
+      say 'gbl.i._RULE: 'gbl.i._RULE
+      say 'i: ' i
+      j = i +1;
+      k = i -1;
+	  //如果当前item的下一个记录的LEVEL是3，就说明他有下一级的节点，所以我们就需要知道他下一集是什么样的节点，以便最终决定显示哪几个action item
+      if gbl.j._LEVEL = 3 then do;
+         //先保存发起action这个节点的信息
+		 attr_pre = gbl.i._RULE || " ";
+		 //因为当前的level是2，那么和他在同一个tree，并且在他之前最多有3个item，所以这里从-3开始，至于+1，其实还需要判断LEVEL=3那里是不是有多个并列的item，
+		 //这里暂时没有考虑这种情况
+         do m = i - 3 to i+1;
+            if gbl.m._LEVEL = 1 | gbl.m._LEVEL = 3 then do;
+               attr_pre = attr_pre || gbl.m._RULE || " ";
+            end;
+         end;
+		 //attr_pre记录了目前我们这个节点的上级，下级，以及他本身的节点名称，我们后面要用这个和全部可能的四个节点名称做对比，找出那个还没有在这个树的item，那就是
+		 //我们需要显示出来的那个item
+         say 'attr_pre: 'attr_pre;
+         attr_in = attrs;
+         do while attr_in \= '';
+            parse var attr_in temp attr_in;
+            if find(attr_pre,temp) = 0 then do;
+                     if lastpos(temp,attrs) = 1 then,
+                        act_tmp = 'T';
+                     if lastpos(temp,attrs) = 8 then,
+                        act_tmp = 'C';
+                     if lastpos(temp,attrs) = 17 then,
+                        act_tmp = 'L';
+                     if lastpos(temp,attrs) = 24  then,
+                        act_tmp = 'U';
+                     say 'act_str1: 'act_str;
+                     act_str = strip(act_str||act_tmp);
+                     say 'act_str1: 'act_str;
+            end;
+         end;
+         queue "SETVAR ZACTIONFILTER """act_str"""";
+      end;
+/* if there is no further item in the next level for the current one */
+//如果紧挨着当前这个记录的下一个记录的level不是3，那么不管他的下一个记录是和他在同一个树里边，是‘并’的关系。，还是他是下一个树的开始节点，我们都可以认为当前节点
+//不存在直接的下一级节点。
+      if gbl.j._LEVEL \= 3 then do;
+         attr_in = attrs;
+         attr_prev = gbl.k._RULE;
+         do while attr_in \= '';
+            parse var attr_in temp attr_in;
+            if temp \= attr_prev &,
+                  temp \= attr then do;
+                     if lastpos(temp,attrs) = 1 then,
+                        act_tmp = 'T';
+                     if lastpos(temp,attrs) = 8 then,
+                        act_tmp = 'C';
+                     if lastpos(temp,attrs) = 17 then,
+                        act_tmp = 'L';
+                     if lastpos(temp,attrs) = 24  then,
+                        act_tmp = 'U';
+            end;
+         act_str = strip(act_str||act_tmp);
+         act_tmp = '';
+         end;
+      queue "SETVAR ZACTIONFILTER """act_str"""";
+      end;
+   end;
+end;
+//如果从第三级开始发起take action
+if level = 3 then do i = 1 to rec#;
+//实际上，这里的判断条件是有漏洞的，比如一个很复杂的树，他包含了相同level,相同节点名的节点不止一个，所以后面需要考虑这种情况
+   if gbl.i._LEVEL = 3 & gbl.i._RULE = attr then do;
+   //先找到发起请求的节点在我们这个rule里边的具体位置(i)
+      m = i + 1;
+      attr_pre = gbl.i._RULE || " ";
+	  //如果他有直接的下一级节点，那么take action只能显示删除
+      if gbl.m._LEVEL = 4 then,
+         queue "SETVAR ZACTIONFILTER   D   ";
+	  //如果没有
+      if gbl.m._LEVEL \= 4 | gbl.m._RULE = 'GBL.M._RULE' then do;
+         attr_in = attrs;
+	  //从level=3往回找，一直到level=1那个节点（同一个树范围内），最多可能有5个前序节点，所以从-5开始
+         do n = i -5 to i;
+            say 'n: 'n;
+            if gbl.n._LEVEL = 1 | gbl.n._LEVEL = 2 then do;
+               attr_pre = attr_pre || gbl.n._RULE || " ";
+            end;
+         end;
+         say 'attr_pre: ' attr_pre;
+         do while attr_in \= '';
+            parse var attr_in temp attr_in;
+            if find(attr_pre,temp) = 0 then do;
+                     if lastpos(temp,attrs) = 1 then,
+                        act_tmp = 'T';
+                     if lastpos(temp,attrs) = 8 then,
+                        act_tmp = 'C';
+                     if lastpos(temp,attrs) = 17 then,
+                        act_tmp = 'L';
+                     if lastpos(temp,attrs) = 24  then,
+                        act_tmp = 'U';
+                     say 'act_str1: 'act_str;
+                     act_str = strip(act_str||act_tmp);
+                     say 'act_str1: 'act_str;
+            end;
+         end;
+         queue "SETVAR ZACTIONFILTER """act_str"""";
+   end;
+end;
+end;
+if gbl._debug then do;
+   say 'pos: ' lastpos( attr ,attrs)
+   say 'level: 'level;
+   say 'attr : 'attr;
+   say 'scname: 'scname;
+   say 'workload: 'workload;
+end;

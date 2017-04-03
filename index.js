@@ -48,8 +48,17 @@ app.locals.blog = {
 // 添加模板必需的三个变量
 app.use(function(req, res, next) {
     res.locals.user = req.session.user;
+    console.log('user lol:');
+    console.log(res.locals.user);
     res.locals.success = req.flash('success').toString();
+    console.log('success:');
+    console.log(res.locals.success);
+    res.locals.error2 = req.flash('error1').toString();
+    console.log('error2:');
+    console.log(res.locals.error2);
     res.locals.error = req.flash('error').toString();
+    console.log('error:');
+    console.log(res.locals.error);
     next();
 });
 //××××××××××××××××××××××××××××××××××××××××××××××××××××××××××//
