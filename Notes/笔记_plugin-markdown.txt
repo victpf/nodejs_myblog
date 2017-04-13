@@ -38,4 +38,11 @@ module.exports = {
       .contentToHtml()
       .exec();
   },
+
+
+///////////////////////////////////////////////////////////////////
+关于Promise的机制以及使用示例
+https://itbilu.com/javascript/js/41KMSZ9a.html
+
+
   
